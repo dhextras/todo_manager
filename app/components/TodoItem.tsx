@@ -1,58 +1,56 @@
-import { useState, useRef } from "react";
-import { useTodoStore } from "../lib/store";
-import FloatingTooltip from "./FloatingTooltip";
-import type { Task } from "../lib/types";
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { useTodoStore } from '../lib/store';
+import FloatingTooltip from './FloatingTooltip';
+import type { Task } from '../lib/types';
 
 interface TodoItemProps {
   task: Task;
-  listType: "todo" | "done" | "ignored";
+  listType: 'todo' | 'done' | 'ignored';
   index: number;
+  onDragStart: (e: React.DragEvent, task: Task) => void;
 }
 
-export default function TodoItem({ task, listType, index }: TodoItemProps) {
+export default function TodoItem({ task, listType, index, onDragStart }: TodoItemProps) {
   const {
     currentUser,
     editingState,
+    dragState,
     canEdit,
     moveTask,
     deleteTask,
     startEditing,
     endEditing,
     updateTask,
-    startDrag,
     updateDrag,
-    endDrag,
   } = useTodoStore();
-
-  const [isEditing, setIsEditing] = useState(false);
+  
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description);
-  const [isDragging, setIsDragging] = useState(false);
-  const itemRef = useRef<HTMLDivElement>(null);
 
   const isBeingEdited = editingState.has(task.id);
   const editingUser = editingState.get(task.id);
   const isMyEdit = editingUser === currentUser?.id;
 
-  const listColors = {
-    todo: "border-l-blue-500",
-    done: "border-l-green-500",
-    ignored: "border-l-gray-500",
-  };
+  // Check if this task is being dragged by someone else
+  const isBeingDraggedByOther = dragState && 
+    dragState.taskId === task.id && 
+    dragState.userId !== currentUser?.id;
 
-  const numberColors = {
-    todo: "bg-blue-500",
-    done: "bg-green-500",
-    ignored: "bg-gray-500",
+  const listColors = {
+    todo: { border: 'border-l-blue-500', bg: 'bg-blue-500' },
+    done: { border: 'border-l-emerald-500', bg: 'bg-emerald-500' },
+    ignored: { border: 'border-l-gray-500', bg: 'bg-gray-500' },
   };
 
   const handleEdit = () => {
-    if (listType !== "todo" || !canEdit || isBeingEdited) return;
-
-    startEditing(task.id, "edit");
-    setIsEditing(true);
+    if (listType !== 'todo' || !canEdit || isBeingEdited) return;
+    
+    startEditing(task.id, 'edit');
     setEditTitle(task.title);
     setEditDesc(task.description);
+    setShowEditModal(true);
   };
 
   const handleSave = () => {
@@ -62,15 +60,30 @@ export default function TodoItem({ task, listType, index }: TodoItemProps) {
         description: editDesc.trim(),
       });
     }
-    setIsEditing(false);
+    setShowEditModal(false);
     endEditing(task.id);
   };
 
   const handleCancel = () => {
-    setIsEditing(false);
+    setShowEditModal(false);
     setEditTitle(task.title);
     setEditDesc(task.description);
     endEditing(task.id);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    }
+  };
+
+  const handleModalBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      handleCancel();
+    }
   };
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -78,47 +91,28 @@ export default function TodoItem({ task, listType, index }: TodoItemProps) {
       e.preventDefault();
       return;
     }
-
-    setIsDragging(true);
-    const rect = itemRef.current?.getBoundingClientRect();
-    if (rect) {
-      const relativePos = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      };
-      startDrag(task.id, { x: e.clientX, y: e.clientY }, relativePos, listType);
-    }
-  };
-
-  const handleDragEnd = (e: React.DragEvent) => {
-    setIsDragging(false);
-    const dropTarget = e.target as HTMLElement;
-    const listElement = dropTarget.closest("[data-list-type]");
-    const dropList = listElement?.getAttribute("data-list-type");
-
-    endDrag(task.id, dropList || undefined);
+    onDragStart(e, task);
   };
 
   const handleDrag = (e: React.DragEvent) => {
-    if (e.clientX !== 0 && e.clientY !== 0) {
-      updateDrag(task.id, { x: e.clientX, y: e.clientY });
-    }
+    // Update drag position for real-time collaboration
+    updateDrag(task.id, { x: e.clientX, y: e.clientY });
   };
 
   const getActionButtons = () => {
-    if (listType === "todo") {
+    if (listType === 'todo') {
       return (
         <div className="flex space-x-1">
           <button
-            onClick={() => moveTask(task.id, listType, "done")}
-            className="w-6 h-6 bg-green-600 hover:bg-green-700 text-white rounded text-xs flex items-center justify-center transition-colors"
+            onClick={() => moveTask(task.id, listType, 'done')}
+            className="w-6 h-6 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-md text-xs flex items-center justify-center transition-all hover:scale-105"
             title="Mark as done"
           >
             ✓
           </button>
           <button
-            onClick={() => moveTask(task.id, listType, "ignored")}
-            className="w-6 h-6 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs flex items-center justify-center transition-colors"
+            onClick={() => moveTask(task.id, listType, 'ignored')}
+            className="w-6 h-6 bg-gray-600/20 hover:bg-gray-600/30 text-gray-400 rounded-md text-xs flex items-center justify-center transition-all hover:scale-105"
             title="Ignore"
           >
             ✗
@@ -130,15 +124,15 @@ export default function TodoItem({ task, listType, index }: TodoItemProps) {
     return (
       <div className="flex space-x-1">
         <button
-          onClick={() => moveTask(task.id, listType, "todo")}
-          className="w-6 h-6 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center justify-center transition-colors"
+          onClick={() => moveTask(task.id, listType, 'todo')}
+          className="w-6 h-6 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-md text-xs flex items-center justify-center transition-all hover:scale-105"
           title="Restore"
         >
           ↶
         </button>
         <button
           onClick={() => deleteTask(task.id, listType)}
-          className="w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded text-xs flex items-center justify-center transition-colors"
+          className="w-6 h-6 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-md text-xs flex items-center justify-center transition-all hover:scale-105"
           title="Delete"
         >
           🗑
@@ -147,103 +141,147 @@ export default function TodoItem({ task, listType, index }: TodoItemProps) {
     );
   };
 
-  if (isEditing) {
-    return (
-      <div
-        ref={itemRef}
-        className={`bg-gray-800 border ${listColors[listType]} border-gray-700 rounded-md p-3 mb-2 relative`}
+  return (
+    <>
+      <motion.div
+        layout
+        layoutId={task.id}
+        draggable={canEdit && !isBeingEdited}
+        onDragStart={handleDragStart}
+        onDrag={handleDrag}
+        className={`bg-gray-900/60 backdrop-blur-sm border ${listColors[listType].border} border-gray-700/50 rounded-lg p-3 relative overflow-hidden group transition-all duration-200 hover:shadow-lg hover:bg-gray-900/80 ${
+          isBeingEdited && !isMyEdit ? 'opacity-60 cursor-not-allowed' : ''
+        } ${
+          canEdit && !isBeingEdited ? 'cursor-grab active:cursor-grabbing' : ''
+        } ${
+          isBeingDraggedByOther ? 'opacity-50 ring-2 ring-yellow-400/50' : ''
+        }`}
       >
-        <div
-          className={`absolute left-0 top-0 w-6 h-6 ${numberColors[listType]} text-white text-xs flex items-center justify-center rounded-br-md`}
-        >
+        <div className={`absolute left-0 top-0 w-6 h-6 ${listColors[listType].bg} text-white text-xs font-medium flex items-center justify-center rounded-br-md`}>
           {index + 1}
         </div>
-
-        <div className="ml-8 space-y-2">
-          <input
-            type="text"
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            className="w-full bg-gray-700 text-white px-2 py-1 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
-            maxLength={40}
-            autoFocus
-          />
-          <textarea
-            value={editDesc}
-            onChange={(e) => setEditDesc(e.target.value)}
-            className="w-full bg-gray-700 text-white px-2 py-1 rounded border border-gray-600 focus:border-blue-500 focus:outline-none resize-none"
-            rows={3}
-            maxLength={200}
-            placeholder="Description (optional)"
-          />
-          <div className="flex space-x-2">
-            <button
-              onClick={handleSave}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors"
-            >
-              Save
-            </button>
-            <button
-              onClick={handleCancel}
-              className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs transition-colors"
-            >
-              Cancel
-            </button>
+        
+        <div className="ml-8 flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <FloatingTooltip content={task.description || 'No description'}>
+              <div
+                onClick={handleEdit}
+                className={`text-white font-medium cursor-pointer transition-colors duration-200 break-words text-sm leading-relaxed line-clamp-2 ${
+                  listType === 'todo' && canEdit && !isBeingEdited ? 'hover:text-blue-400' : ''
+                }`}
+                style={{
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word',
+                  hyphens: 'auto',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+                title={task.title}
+              >
+                {task.title}
+              </div>
+            </FloatingTooltip>
+          </div>
+          
+          <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            {getActionButtons()}
           </div>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={itemRef}
-      draggable={listType === "todo" && canEdit && !isBeingEdited}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDrag={handleDrag}
-      className={`bg-gray-800 border ${
-        listColors[listType]
-      } border-gray-700 rounded-md p-3 mb-2 relative transition-all duration-200 ${
-        isDragging ? "opacity-50 rotate-1" : "hover:bg-gray-750"
-      } ${
-        isBeingEdited && !isMyEdit
-          ? "opacity-60 cursor-not-allowed"
-          : "cursor-move"
-      }`}
-    >
-      <div
-        className={`absolute left-0 top-0 w-6 h-6 ${numberColors[listType]} text-white text-xs flex items-center justify-center rounded-br-md`}
-      >
-        {index + 1}
-      </div>
-
-      <div className="ml-8 flex items-center justify-between">
-        <div className="flex-1 min-w-0">
-          <FloatingTooltip content={task.description}>
-            <div
-              onClick={handleEdit}
-              className={`text-white font-medium truncate ${
-                listType === "todo" && canEdit && !isBeingEdited
-                  ? "cursor-pointer hover:text-blue-400"
-                  : ""
-              }`}
-            >
-              {task.title}
+        
+        {isBeingEdited && !isMyEdit && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg flex items-center justify-center">
+            <div className="text-white text-xs bg-gray-900/80 backdrop-blur px-3 py-2 rounded-md shadow-lg">
+              Being edited by another user
             </div>
-          </FloatingTooltip>
-        </div>
+          </div>
+        )}
 
-        <div className="ml-3 flex-shrink-0">{getActionButtons()}</div>
-      </div>
+        {isBeingDraggedByOther && (
+          <div className="absolute inset-0 bg-yellow-500/10 backdrop-blur-sm rounded-lg flex items-center justify-center">
+            <div className="text-yellow-300 text-xs bg-yellow-900/80 backdrop-blur px-3 py-2 rounded-md shadow-lg">
+              Being dragged by another user
+            </div>
+          </div>
+        )}
+      </motion.div>
 
-      {isBeingEdited && !isMyEdit && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 rounded-md flex items-center justify-center">
-          <div className="text-white text-sm bg-gray-800 px-2 py-1 rounded">
-            Being edited by another user
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={handleModalBackdropClick}
+        >
+          <div className="bg-gray-900/90 backdrop-blur border border-gray-700/50 p-6 rounded-xl shadow-2xl max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-white">Edit Task</h3>
+              <button
+                onClick={handleCancel}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  className="w-full px-3 py-2 bg-gray-800/50 text-white rounded-lg border border-gray-600/50 focus:border-blue-500 focus:outline-none transition-colors text-sm"
+                  placeholder="Task title"
+                  maxLength={40}
+                  autoFocus
+                />
+                <div className="text-right text-xs text-gray-400 mt-1">
+                  {editTitle.length}/40
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Description
+                </label>
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  className="w-full px-3 py-2 bg-gray-800/50 text-white rounded-lg border border-gray-600/50 focus:border-blue-500 focus:outline-none resize-none transition-colors text-sm"
+                  placeholder="Optional description"
+                  rows={3}
+                  maxLength={200}
+                />
+                <div className="text-right text-xs text-gray-400 mt-1">
+                  {editDesc.length}/200
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 pt-2">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={!editTitle.trim()}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
