@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTodoStore } from '../lib/store';
 import UserBar from './UserBar';
 import TodoList from './TodoList';
@@ -26,9 +26,24 @@ export default function TodoApp() {
       useTodoStore.getState().sendMouseMove(e.clientX, e.clientY);
     };
 
+    const handleBeforeUnload = () => {
+      // Socket will handle cleanup automatically on disconnect
+    };
+
+    const handleVisibilityChange = () => {
+      // Socket will handle cleanup automatically on disconnect
+    };
+
     if (currentUser) {
       document.addEventListener('mousemove', handleMouseMove);
-      return () => document.removeEventListener('mousemove', handleMouseMove);
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
   }, [currentUser]);
 

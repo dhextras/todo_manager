@@ -1,33 +1,63 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FloatingTooltipProps {
   content: string;
   children: React.ReactNode;
-  maxWidth?: number;
   delay?: number;
 }
 
-export default function FloatingTooltip({
-  content,
-  children,
-  maxWidth = 300,
-  delay = 500,
-}: FloatingTooltipProps) {
+export default function FloatingTooltip({ content, children, delay = 500 }: FloatingTooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [tooltipPosition, setTooltipPosition] = useState('bottom');
   const timeoutRef = useRef<NodeJS.Timeout>();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    if (!content.trim()) return;
+  const calculatePosition = (rect: DOMRect) => {
+    const tooltipWidth = 250;
+    const tooltipHeight = 80;
+    const margin = 10;
+    
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    let x = rect.left + rect.width / 2 - tooltipWidth / 2;
+    let y = rect.bottom + margin;
+    let position = 'bottom';
+    
+    // Check if tooltip goes off right edge
+    if (x + tooltipWidth > viewportWidth - margin) {
+      x = viewportWidth - tooltipWidth - margin;
+    }
+    
+    // Check if tooltip goes off left edge
+    if (x < margin) {
+      x = margin;
+    }
+    
+    // Check if tooltip goes off bottom edge
+    if (y + tooltipHeight > viewportHeight - margin) {
+      y = rect.top - tooltipHeight - margin;
+      position = 'top';
+    }
+    
+    return { x, y, position };
+  };
 
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
     timeoutRef.current = setTimeout(() => {
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      setPosition({
-        x: rect.left + rect.width / 2,
-        y: rect.top - 10,
-      });
-      setIsVisible(true);
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const { x, y, position } = calculatePosition(rect);
+        setPosition({ x, y });
+        setTooltipPosition(position);
+        setIsVisible(true);
+      }
     }, delay);
   };
 
@@ -52,31 +82,42 @@ export default function FloatingTooltip({
         ref={containerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="inline-block"
+        className="inline-block w-full"
       >
         {children}
       </div>
 
-      {isVisible && (
-        <div
-          className="fixed z-50 pointer-events-none"
-          style={{
-            left: position.x,
-            top: position.y,
-            transform: "translateX(-50%) translateY(-100%)",
-          }}
-        >
-          <div
-            className="bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg max-h-32 overflow-y-auto"
-            style={{ maxWidth }}
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.15 }}
+            className="fixed z-[200] pointer-events-none"
+            style={{
+              left: position.x,
+              top: position.y,
+              maxWidth: '250px',
+            }}
           >
-            <div className="whitespace-pre-wrap break-words">{content}</div>
-          </div>
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2">
-            <div className="border-4 border-transparent border-t-gray-900"></div>
-          </div>
-        </div>
-      )}
+            <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-600/50 rounded-lg p-3 shadow-2xl">
+              <div className="text-white text-xs leading-relaxed break-words">
+                {content}
+              </div>
+              
+              {/* Arrow */}
+              <div
+                className={`absolute w-2 h-2 bg-gray-900/95 border-gray-600/50 transform rotate-45 ${
+                  tooltipPosition === 'bottom' 
+                    ? 'border-t border-l -top-1 left-1/2 -translate-x-1/2' 
+                    : 'border-b border-r -bottom-1 left-1/2 -translate-x-1/2'
+                }`}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

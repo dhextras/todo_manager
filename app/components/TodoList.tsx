@@ -14,33 +14,21 @@ const DropIndicator = ({ beforeId, column }: { beforeId: string | null; column: 
     <div
       data-before={beforeId || "-1"}
       data-column={column}
-      className="my-1 h-0.5 w-full bg-blue-400 opacity-0 transition-opacity duration-200 rounded-full"
+      className="my-0.5 h-0.5 w-full bg-blue-400 opacity-0"
     />
   );
 };
 
 export default function TodoList({ listType, title, tasks }: TodoListProps) {
-  const { clearList, startDrag, endDrag, dragState, currentUser } = useTodoStore();
+  const { clearList, tasks: allTasks, setTasks } = useTodoStore();
   const [active, setActive] = useState(false);
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     e.dataTransfer.setData("taskId", task.id);
-    e.dataTransfer.setData("sourceList", listType);
-    
-    // Calculate relative position within the dragged element
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    const relativePos = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-    
-    // Start drag in collaboration system
-    startDrag(task.id, { x: e.clientX, y: e.clientY }, relativePos, listType);
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
     const taskId = e.dataTransfer.getData("taskId");
-    const sourceList = e.dataTransfer.getData("sourceList");
 
     setActive(false);
     clearHighlights();
@@ -51,28 +39,42 @@ export default function TodoList({ listType, title, tasks }: TodoListProps) {
     const before = element.dataset.before || "-1";
 
     if (before !== taskId) {
-      // Handle the actual task movement
-      const { moveTask, tasks: currentTasks } = useTodoStore.getState();
+      let allTasksCopy = { ...allTasks };
       
-      let targetTask = null;
       // Find the task in any list
-      for (const list of Object.values(currentTasks)) {
-        targetTask = list.find((t: Task) => t.id === taskId);
-        if (targetTask) break;
+      let taskToTransfer: Task | null = null;
+      let sourceList: 'todo' | 'done' | 'ignored' | null = null;
+      
+      for (const [listName, taskList] of Object.entries(allTasksCopy) as [keyof typeof allTasksCopy, Task[]][]) {
+        const foundTask = taskList.find((t) => t.id === taskId);
+        if (foundTask) {
+          taskToTransfer = foundTask;
+          sourceList = listName;
+          break;
+        }
       }
 
-      if (targetTask && sourceList !== listType) {
-        // Moving between lists
-        moveTask(taskId, sourceList, listType);
-      } else if (targetTask && sourceList === listType) {
-        // Reordering within the same list - for now we'll just use the existing moveTask
-        // In a full implementation, you'd handle reordering here
-        console.log('Reordering within same list - feature can be added');
+      if (!taskToTransfer || !sourceList) return;
+
+      // Remove task from source list
+      allTasksCopy[sourceList] = allTasksCopy[sourceList].filter((t) => t.id !== taskId);
+
+      // Add to target list
+      const moveToBack = before === "-1";
+
+      if (moveToBack) {
+        allTasksCopy[listType].push(taskToTransfer);
+      } else {
+        const insertAtIndex = allTasksCopy[listType].findIndex((el) => el.id === before);
+        if (insertAtIndex === -1) {
+          allTasksCopy[listType].push(taskToTransfer);
+        } else {
+          allTasksCopy[listType].splice(insertAtIndex, 0, taskToTransfer);
+        }
       }
+
+      setTasks(allTasksCopy);
     }
-
-    // End drag in collaboration system
-    endDrag(taskId, listType);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -146,18 +148,9 @@ export default function TodoList({ listType, title, tasks }: TodoListProps) {
     ignored: 'border-gray-500/20 bg-gray-500/5',
   };
 
-  const dragActiveColors = {
-    todo: 'bg-blue-500/10',
-    done: 'bg-emerald-500/10', 
-    ignored: 'bg-gray-500/10',
-  };
-
-  // Check if someone else is dragging to this list
-  const isBeingDraggedTo = dragState && dragState.userId !== currentUser?.id;
-
   return (
     <div className={`flex-1 bg-gray-900/40 backdrop-blur-sm border ${accentColors[listType]} rounded-xl min-h-0 flex flex-col overflow-hidden transition-colors ${
-      active ? dragActiveColors[listType] : ''
+      active ? "bg-neutral-800/50" : "bg-neutral-800/0"
     }`}>
       <div className="p-4 border-b border-gray-700/30">
         <div className="flex items-center justify-between">
@@ -180,38 +173,31 @@ export default function TodoList({ listType, title, tasks }: TodoListProps) {
       </div>
       
       <div 
-        className="flex-1 p-4 overflow-y-auto transition-colors" 
+        className="flex-1 p-4 overflow-y-auto" 
         style={{ scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}
         onDrop={handleDragEnd}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-      >
-        {isBeingDraggedTo && (
-          <div className="mb-2 p-2 bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-300 text-xs text-center">
-            Another user is dragging to this list
-          </div>
-        )}
-        
-        <DropIndicator beforeId={null} column={listType} />
-        
+      >        
         {tasks.length === 0 ? (
           <div className="text-center text-gray-500 text-sm mt-8">
             No {title.toLowerCase()} items
           </div>
         ) : (
-          <div className="space-y-2">
-            {tasks.map((task, index) => (
+          <>
+            {tasks.map((task) => (
               <div key={task.id}>
+                <DropIndicator beforeId={task.id} column={listType} />
                 <TodoItem
                   task={task}
                   listType={listType}
-                  index={index}
+                  index={tasks.findIndex(t => t.id === task.id)}
                   onDragStart={handleDragStart}
                 />
-                <DropIndicator beforeId={task.id} column={listType} />
               </div>
             ))}
-          </div>
+            <DropIndicator beforeId={null} column={listType} />
+          </>
         )}
       </div>
     </div>

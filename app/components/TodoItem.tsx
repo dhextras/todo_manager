@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTodoStore } from '../lib/store';
 import FloatingTooltip from './FloatingTooltip';
@@ -15,14 +15,12 @@ export default function TodoItem({ task, listType, index, onDragStart }: TodoIte
   const {
     currentUser,
     editingState,
-    dragState,
     canEdit,
     moveTask,
     deleteTask,
     startEditing,
     endEditing,
     updateTask,
-    updateDrag,
   } = useTodoStore();
   
   const [showEditModal, setShowEditModal] = useState(false);
@@ -33,10 +31,37 @@ export default function TodoItem({ task, listType, index, onDragStart }: TodoIte
   const editingUser = editingState.get(task.id);
   const isMyEdit = editingUser === currentUser?.id;
 
-  // Check if this task is being dragged by someone else
-  const isBeingDraggedByOther = dragState && 
-    dragState.taskId === task.id && 
-    dragState.userId !== currentUser?.id;
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isMyEdit) {
+        endEditing(task.id);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && isMyEdit) {
+        handleCancel();
+      }
+    };
+
+    if (isMyEdit) {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, [isMyEdit, task.id, endEditing]);
+
+  useEffect(() => {
+    return () => {
+      if (isMyEdit) {
+        endEditing(task.id);
+      }
+    };
+  }, []);
 
   const listColors = {
     todo: { border: 'border-l-blue-500', bg: 'bg-blue-500' },
@@ -84,19 +109,6 @@ export default function TodoItem({ task, listType, index, onDragStart }: TodoIte
     if (e.target === e.currentTarget) {
       handleCancel();
     }
-  };
-
-  const handleDragStart = (e: React.DragEvent) => {
-    if (!canEdit || isBeingEdited) {
-      e.preventDefault();
-      return;
-    }
-    onDragStart(e, task);
-  };
-
-  const handleDrag = (e: React.DragEvent) => {
-    // Update drag position for real-time collaboration
-    updateDrag(task.id, { x: e.clientX, y: e.clientY });
   };
 
   const getActionButtons = () => {
@@ -147,14 +159,9 @@ export default function TodoItem({ task, listType, index, onDragStart }: TodoIte
         layout
         layoutId={task.id}
         draggable={canEdit && !isBeingEdited}
-        onDragStart={handleDragStart}
-        onDrag={handleDrag}
-        className={`bg-gray-900/60 backdrop-blur-sm border ${listColors[listType].border} border-gray-700/50 rounded-lg p-3 relative overflow-hidden group transition-all duration-200 hover:shadow-lg hover:bg-gray-900/80 ${
+        onDragStart={(e) => onDragStart(e, task)}
+        className={`bg-gray-900/60 backdrop-blur-sm border ${listColors[listType].border} border-gray-700/50 rounded-lg p-3 relative overflow-hidden group transition-all duration-200 hover:shadow-lg hover:bg-gray-900/80 mb-2 cursor-grab active:cursor-grabbing ${
           isBeingEdited && !isMyEdit ? 'opacity-60 cursor-not-allowed' : ''
-        } ${
-          canEdit && !isBeingEdited ? 'cursor-grab active:cursor-grabbing' : ''
-        } ${
-          isBeingDraggedByOther ? 'opacity-50 ring-2 ring-yellow-400/50' : ''
         }`}
       >
         <div className={`absolute left-0 top-0 w-6 h-6 ${listColors[listType].bg} text-white text-xs font-medium flex items-center justify-center rounded-br-md`}>
@@ -198,23 +205,20 @@ export default function TodoItem({ task, listType, index, onDragStart }: TodoIte
             </div>
           </div>
         )}
-
-        {isBeingDraggedByOther && (
-          <div className="absolute inset-0 bg-yellow-500/10 backdrop-blur-sm rounded-lg flex items-center justify-center">
-            <div className="text-yellow-300 text-xs bg-yellow-900/80 backdrop-blur px-3 py-2 rounded-md shadow-lg">
-              Being dragged by another user
-            </div>
-          </div>
-        )}
       </motion.div>
 
-      {/* Edit Modal */}
       {showEditModal && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={handleModalBackdropClick}
         >
-          <div className="bg-gray-900/90 backdrop-blur border border-gray-700/50 p-6 rounded-xl shadow-2xl max-w-md w-full">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            className="bg-gray-900/90 backdrop-blur border border-gray-700/50 p-6 rounded-xl shadow-2xl max-w-md w-full"
+          >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-white">Edit Task</h3>
               <button
@@ -279,7 +283,7 @@ export default function TodoItem({ task, listType, index, onDragStart }: TodoIte
                 </button>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
     </>
