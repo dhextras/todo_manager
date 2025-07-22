@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { useTodoStore } from "../lib/store";
+import { useEffect, useState } from "react";
 import { MousePosition } from "~/lib/types";
+import { useTodoStore } from "../lib/store";
 
 export default function UserBar() {
   const {

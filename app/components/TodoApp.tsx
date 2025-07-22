@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTodoStore } from "../lib/store";
-import UserBar from "./UserBar";
 import TodoList from "./TodoList";
+import UserBar from "./UserBar";
 
 export default function TodoApp() {
   const {

@@ -1,11 +1,11 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import type {
-  ServerState,
-  User,
-  TaskLists,
-  EditingLock,
   DragOperation,
+  EditingLock,
+  ServerState,
   Task,
+  TaskLists,
+  User,
 } from "../lib/types";
 
 import { SimpleBackupManager } from "./backup";

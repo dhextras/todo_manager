@@ -1,4 +1,4 @@
-import { gzipSync, gunzipSync } from "zlib";
+import { gunzipSync, gzipSync } from "zlib";
 
 const COMPRESSION_THRESHOLD = 1024;
 

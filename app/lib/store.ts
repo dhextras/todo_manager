@@ -2,10 +2,10 @@ import { create } from "zustand";
 import { socketClient } from "./socket";
 import type {
   ClientState,
-  User,
-  TaskLists,
   DragOperation,
   MousePosition,
+  TaskLists,
+  User,
 } from "./types";
 
 interface TodoStore extends ClientState {

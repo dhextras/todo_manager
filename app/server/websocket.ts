@@ -1,8 +1,8 @@
 import { Server } from "socket.io";
 import { v4 as uuidv4 } from "uuid";
-import { StateManager } from "./state";
+import type { DragOperation, SocketMessage, Task } from "../lib/types";
 import { compressMessage } from "./compression";
-import type { SocketMessage, Task, DragOperation } from "../lib/types";
+import { StateManager } from "./state";
 
 export class WebSocketServer {
   private io: Server;

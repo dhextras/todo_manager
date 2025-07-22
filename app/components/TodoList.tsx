@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { useTodoStore } from "../lib/store";
-import TodoItem from "./TodoItem";
 import type { Task } from "../lib/types";
+import TodoItem from "./TodoItem";
 
 interface TodoListProps {
   listType: "todo" | "done" | "ignored";
