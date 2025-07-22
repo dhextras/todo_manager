@@ -38,6 +38,9 @@ export interface DragOperation {
 export interface MousePosition {
   x: number;
   y: number;
+  vw: number;
+  vh: number;
+  pr: number; // NOTE: Just useless but i dont wanna change it on bunch places
   timestamp: number;
 }
 

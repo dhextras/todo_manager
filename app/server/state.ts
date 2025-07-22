@@ -1,4 +1,4 @@
-import { writeFileSync, readFileSync, existsSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
 import type {
   ServerState,
   User,
@@ -8,13 +8,20 @@ import type {
   Task,
 } from "../lib/types";
 
-const DATA_FILE = "data.json";
+import { SimpleBackupManager } from "./backup";
+
+const DATA_FILE = "data/data.json";
 const EDIT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 export class StateManager {
   private state: ServerState;
+  private backupManager: SimpleBackupManager;
 
   constructor() {
+    if (!existsSync("data")) {
+      mkdirSync("data", { recursive: true });
+    }
+
     this.state = {
       users: new Map(),
       tasks: this.loadTasks(),
@@ -22,6 +29,7 @@ export class StateManager {
       dragOperations: new Map(),
     };
 
+    this.backupManager = new SimpleBackupManager();
     this.startCleanupTimer();
   }
 
@@ -50,11 +58,9 @@ export class StateManager {
     setInterval(() => {
       const now = Date.now();
 
-      // Clean up expired editing locks
       for (const [taskId, lock] of this.state.editingLocks) {
         if (now - lock.timestamp > EDIT_TIMEOUT) {
           this.state.editingLocks.delete(taskId);
-          // Remove editing state from user
           const user = this.state.users.get(lock.userId);
           if (user && user.editing === taskId) {
             user.editing = undefined;
@@ -62,10 +68,8 @@ export class StateManager {
         }
       }
 
-      // Clean up stale drag operations
       for (const [userId, drag] of this.state.dragOperations) {
         if (now - drag.startPos.x > 30000) {
-          // 30 seconds timeout
           this.state.dragOperations.delete(userId);
           this.releaseEditingLock(drag.taskId);
         }
@@ -73,7 +77,6 @@ export class StateManager {
     }, 30000);
   }
 
-  // User management
   addUser(socketId: string, name: string): User {
     const existingUser = Array.from(this.state.users.values()).find(
       (u) => u.name === name,
@@ -97,19 +100,18 @@ export class StateManager {
   removeUser(socketId: string): void {
     const user = this.state.users.get(socketId);
     if (user) {
-      // Release any editing locks
       if (user.editing) {
         this.releaseEditingLock(user.editing);
       }
-
-      // Remove drag operations
       this.state.dragOperations.delete(socketId);
-
       this.state.users.delete(socketId);
     }
   }
 
-  updateUserMouse(socketId: string, mouse: { x: number; y: number }): void {
+  updateUserMouse(
+    socketId: string,
+    mouse: { x: number; y: number; vw: number; vh: number; pr: number },
+  ): void {
     const user = this.state.users.get(socketId);
     if (user) {
       user.mouse = mouse;
@@ -120,7 +122,6 @@ export class StateManager {
     return Array.from(this.state.users.values());
   }
 
-  // Editing locks
   acquireEditingLock(
     userId: string,
     taskId: string,
@@ -160,10 +161,44 @@ export class StateManager {
     return this.state.editingLocks;
   }
 
-  // Task operations
   addTask(task: Task): void {
     this.state.tasks.todo.push(task);
     this.saveTasks();
+  }
+
+  moveTaskWithPosition(
+    taskId: string,
+    fromList: keyof TaskLists,
+    toList: keyof TaskLists,
+    beforeTaskId: string,
+  ): boolean {
+    const fromArray = this.state.tasks[fromList];
+    const toArray = this.state.tasks[toList];
+
+    const taskIndex = fromArray.findIndex((t) => t.id === taskId);
+    if (taskIndex === -1) return false;
+
+    const [task] = fromArray.splice(taskIndex, 1);
+
+    if (fromList === toList) {
+      const targetIndex = fromArray.findIndex((t) => t.id === beforeTaskId);
+      if (targetIndex === -1) {
+        fromArray.splice(0, 0, task);
+      } else {
+        fromArray.splice(targetIndex + 1, 0, task);
+      }
+    } else {
+      const targetIndex = toArray.findIndex((t) => t.id === beforeTaskId);
+      if (targetIndex === -1) {
+        toArray.splice(0, 0, task);
+      } else {
+        toArray.splice(targetIndex + 1, 0, task);
+      }
+    }
+
+    this.releaseEditingLock(taskId);
+    this.saveTasks();
+    return true;
   }
 
   moveTask(
@@ -219,7 +254,6 @@ export class StateManager {
     return this.state.tasks;
   }
 
-  // Drag operations
   startDrag(userId: string, drag: DragOperation): void {
     this.state.dragOperations.set(userId, drag);
   }
@@ -244,6 +278,10 @@ export class StateManager {
     return this.state.dragOperations;
   }
 
+  getBackupInfo() {
+    return this.backupManager.getBackupInfo();
+  }
+
   private generateAvatar(): string {
     const colors = [
       "#FF6B6B",
@@ -254,7 +292,9 @@ export class StateManager {
       "#FF9FF3",
       "#54A0FF",
     ];
-    const shapes = ["circle", "square"];
+
+    const shapes = ["circle", "square", "diamond", "pentagon"];
+
     const color = colors[Math.floor(Math.random() * colors.length)];
     const shape = shapes[Math.floor(Math.random() * shapes.length)];
     return `${color}-${shape}`;

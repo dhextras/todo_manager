@@ -178,34 +178,49 @@ export class WebSocketServer {
         this.stateManager.updateDrag(socket.id, data.currentPos);
         socket.broadcast.emit("drag-move", {
           userId: socket.id,
-          taskId: data.taskId,
           currentPos: data.currentPos,
         });
       });
 
       socket.on("drag-end", (data) => {
         const dragOp = this.stateManager.endDrag(socket.id);
+
         if (dragOp && data.dropList) {
-          const success = this.stateManager.moveTask(
-            dragOp.taskId,
-            dragOp.fromList as any,
-            data.dropList,
-          );
+          let success = false;
+
+          if (data.beforeTaskId) {
+            success = this.stateManager.moveTaskWithPosition(
+              dragOp.taskId,
+              dragOp.fromList as any,
+              data.dropList,
+              data.beforeTaskId,
+            );
+          } else {
+            success = this.stateManager.moveTaskWithPosition(
+              dragOp.taskId,
+              dragOp.fromList as any,
+              data.dropList,
+              "-1",
+            );
+          }
+
           if (success) {
             this.broadcastMessage("document-change", {
               type: "task-move",
               taskId: dragOp.taskId,
               fromList: dragOp.fromList,
               toList: data.dropList,
+              beforeTaskId: data.beforeTaskId,
               tasks: this.stateManager.getTasks(),
             });
           }
         }
 
+        // Always broadcast drag end for cleanup
         this.broadcastMessage("drag-end", {
           userId: socket.id,
           taskId: dragOp?.taskId,
-          success: !!data.dropList,
+          success: !!(dragOp && data.dropList),
         });
       });
 

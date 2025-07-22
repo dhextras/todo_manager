@@ -49,3 +49,11 @@
     background-image: radial-gradient(circle, var(--tw-gradient-stops));
   }
 }
+
+/* NOTE: Remove the selection altogather */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}

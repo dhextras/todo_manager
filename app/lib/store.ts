@@ -9,6 +9,8 @@ import type {
 } from "./types";
 
 interface TodoStore extends ClientState {
+  isConnected: boolean;
+
   // Actions
   setCurrentUser: (user: User) => void;
   setConnectedUsers: (users: User[]) => void;
@@ -19,6 +21,7 @@ interface TodoStore extends ClientState {
   setDragState: (drag: DragOperation | null) => void;
   setCanEdit: (canEdit: boolean) => void;
   setIsEditing: (isEditing: boolean) => void;
+  setIsConnected: (isConnected: boolean) => void;
 
   // Socket actions
   joinUser: (name: string) => void;
@@ -33,15 +36,54 @@ interface TodoStore extends ClientState {
     relativePos: { x: number; y: number },
     fromList: string,
   ) => void;
-  updateDrag: (taskId: string, currentPos: { x: number; y: number }) => void;
-  endDrag: (taskId: string, dropList?: string) => void;
-  sendMouseMove: (x: number, y: number) => void;
+  updateDrag: (currentPos: { x: number; y: number }) => void;
+  endDrag: (taskId: string, dropList?: string, beforeTaskId?: string) => void;
+  sendMouseMove: (
+    x: number,
+    y: number,
+    vw: number,
+    vh: number,
+    pr: number,
+  ) => void;
   startEditing: (taskId: string, type?: "edit" | "drag" | "move") => void;
   endEditing: (taskId: string) => void;
 }
 
 export const useTodoStore = create<TodoStore>((set, get) => {
   // Setup socket event handlers
+  const cleanupInvalidStates = () => {
+    const { connectedUsers, editingState, dragState } = get();
+    const connectedUserIds = new Set(connectedUsers.map((user) => user.id));
+
+    let editingChanged = false;
+    const newEditingState = new Map(editingState);
+
+    for (const [taskId, user] of editingState) {
+      const userId = user.userId;
+      if (!connectedUserIds.has(userId)) {
+        newEditingState.delete(taskId);
+        editingChanged = true;
+      }
+    }
+
+    let dragChanged = false;
+    let newDragState = dragState;
+
+    if (dragState && !connectedUserIds.has(dragState.userId)) {
+      newDragState = null;
+      dragChanged = true;
+    }
+
+    if (editingChanged || dragChanged) {
+      set({
+        ...(editingChanged && { editingState: newEditingState }),
+        ...(dragChanged && { dragState: newDragState }),
+      });
+    }
+  };
+
+  setInterval(cleanupInvalidStates, 60 * 1000); // Cleanup per min
+
   socketClient.on("initial-state", (data) => {
     set({
       currentUser: data.currentUser,
@@ -54,6 +96,8 @@ export const useTodoStore = create<TodoStore>((set, get) => {
 
   socketClient.on("users-update", (data) => {
     set({ connectedUsers: data.users });
+    // Run cleanup immediately when users update (someone disconnected)
+    setTimeout(cleanupInvalidStates, 100);
   });
 
   socketClient.on("mouse-move", (data) => {
@@ -62,6 +106,9 @@ export const useTodoStore = create<TodoStore>((set, get) => {
     newPositions.set(data.userId, {
       x: data.x,
       y: data.y,
+      vw: data.vw,
+      vh: data.vh,
+      pr: data.pr,
       timestamp: Date.now(),
     });
     set({ mousePositions: newPositions });
@@ -120,11 +167,14 @@ export const useTodoStore = create<TodoStore>((set, get) => {
     mousePositions: new Map(),
     isEditing: false,
     canEdit: true,
+    isConnected: false,
 
-    // Actions
+    // FIXME: Don't know why but for some fucking reason these aren't being used
+    // And i forgot why i added them & Might be useful sometime later so just fucking leave it be...
     setCurrentUser: (user) => set({ currentUser: user }),
     setConnectedUsers: (users) => set({ connectedUsers: users }),
     setTasks: (tasks) => set({ tasks }),
+    setIsConnected: (isConnected) => set({ isConnected }),
 
     updateMousePosition: (userId, position) => {
       const { mousePositions } = get();
@@ -161,10 +211,11 @@ export const useTodoStore = create<TodoStore>((set, get) => {
     clearList: (listType) => socketClient.clearList(listType),
     startDrag: (taskId, startPos, relativePos, fromList) =>
       socketClient.startDrag(taskId, startPos, relativePos, fromList),
-    updateDrag: (taskId, currentPos) =>
-      socketClient.updateDrag(taskId, currentPos),
-    endDrag: (taskId, dropList) => socketClient.endDrag(taskId, dropList),
-    sendMouseMove: (x, y) => socketClient.sendMouseMove(x, y),
+    updateDrag: (currentPos) => socketClient.updateDrag(currentPos),
+    endDrag: (taskId, dropList, beforeTaskId) =>
+      socketClient.endDrag(taskId, dropList, beforeTaskId),
+    sendMouseMove: (x, y, vw, vh, pr) =>
+      socketClient.sendMouseMove(x, y, vw, vh, pr),
     startEditing: (taskId, type) => socketClient.startEditing(taskId, type),
     endEditing: (taskId) => socketClient.endEditing(taskId),
   };
