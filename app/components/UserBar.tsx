@@ -273,10 +273,10 @@ export default function UserBar() {
                   className="w-full resize-none rounded-lg border border-gray-600/50 bg-gray-800/50 px-3 py-2 text-sm text-white transition-colors focus:border-blue-500 focus:outline-none"
                   placeholder="Optional description"
                   rows={10}
-                  maxLength={200}
+                  maxLength={2000}
                 />
                 <div className="mt-1 text-right text-xs text-gray-400">
-                  {newDesc.length}/200
+                  {newDesc.length}/2000
                 </div>
               </div>
 
