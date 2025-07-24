@@ -11,6 +11,11 @@ export class SocketClient {
 
   constructor() {
     const getWebSocketUrl = () => {
+      if (typeof window === "undefined") {
+        // Return a default URL for SSR - this won't be used
+        return "http://localhost:5765";
+      }
+
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const hostname = window.location.hostname;
       const port = window.location.port;
