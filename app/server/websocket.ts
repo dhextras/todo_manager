@@ -28,7 +28,6 @@ export class WebSocketServer {
         try {
           const user = this.stateManager.addUser(socket.id, data.name);
 
-          // Send initial state to new user
           this.sendMessage(socket, "initial-state", {
             currentUser: user,
             users: this.stateManager.getUsers(),
@@ -41,7 +40,6 @@ export class WebSocketServer {
             ),
           });
 
-          // Broadcast user joined to others
           this.broadcastMessage("users-update", {
             users: this.stateManager.getUsers(),
           });

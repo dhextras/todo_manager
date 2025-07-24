@@ -10,8 +10,23 @@ export class SocketClient {
   private dragThrottle: number = 0;
 
   constructor() {
-    // FIXME: Make sure to use the domain when we add that
-    const wsUrl = "http://localhost:5765";
+    const getWebSocketUrl = () => {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+
+      if (hostname === "localhost" || hostname === "127.0.0.1") {
+        return `ws://localhost:5765/ws`;
+      }
+
+      if (port && port !== "80" && port !== "443") {
+        return `${protocol}//${hostname}:${port}/ws`;
+      } else {
+        return `${protocol}//${hostname}/ws`;
+      }
+    };
+
+    const wsUrl = getWebSocketUrl();
     this.socket = io(wsUrl);
     this.setupEventHandlers();
   }
@@ -85,7 +100,7 @@ export class SocketClient {
     pr: number,
   ): void {
     const now = Date.now();
-    if (now - this.mouseThrottle < 10) return; // NOTE: 10ms throttle
+    if (now - this.mouseThrottle < 10) return; // 10ms throttle
 
     this.mouseThrottle = now;
     this.emit("mouse-move", { x, y, vw, vh, pr });
@@ -130,7 +145,7 @@ export class SocketClient {
 
   updateDrag(currentPos: { x: number; y: number }): void {
     const now = Date.now();
-    if (now - this.dragThrottle < 10) return; // NOTE: 10ms throttle
+    if (now - this.dragThrottle < 10) return; // 10ms throttle
 
     this.dragThrottle = now;
     this.emit("drag-move", { currentPos });

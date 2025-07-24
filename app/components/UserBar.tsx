@@ -184,7 +184,7 @@ export default function UserBar() {
 
           const localX = relativeX * currentVW;
           // NOTE: Dont apply the prRatio to X, i dont wanna explain why
-          // so just fucking listen
+          // so just fucking listen and leave it be alr
           const prRatio = currentPR / senderPos.pr;
           const localY = relativeY * currentVH * prRatio;
 

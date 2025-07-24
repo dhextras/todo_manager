@@ -1,6 +1,5 @@
 # Todo Manager
 
-
 Live collaborative todo manager with some cool animation
 
 ## 🚀 Getting Started

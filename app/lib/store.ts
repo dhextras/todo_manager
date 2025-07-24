@@ -158,7 +158,6 @@ export const useTodoStore = create<TodoStore>((set, get) => {
   });
 
   return {
-    // Initial state
     currentUser: null,
     connectedUsers: [],
     tasks: { todo: [], done: [], ignored: [] },
@@ -201,7 +200,6 @@ export const useTodoStore = create<TodoStore>((set, get) => {
     setCanEdit: (canEdit) => set({ canEdit }),
     setIsEditing: (isEditing) => set({ isEditing }),
 
-    // Socket actions
     joinUser: (name) => socketClient.joinUser(name),
     addTask: (title, description) => socketClient.addTask(title, description),
     updateTask: (taskId, updates) => socketClient.updateTask(taskId, updates),

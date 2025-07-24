@@ -82,7 +82,6 @@ export default function TodoApp() {
     }
   };
 
-  // Get the task being dragged for display
   const getDraggedTaskInfo = () => {
     if (!dragState) return null;
 
