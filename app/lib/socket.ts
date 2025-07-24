@@ -21,13 +21,13 @@ export class SocketClient {
       const port = window.location.port;
 
       if (hostname === "localhost" || hostname === "127.0.0.1") {
-        return `ws://localhost:5765/ws`;
+        return `http://localhost:5765`;
       }
 
       if (port && port !== "80" && port !== "443") {
-        return `${protocol}//${hostname}:${port}/ws`;
+        return `${protocol}//${hostname}:${port}`;
       } else {
-        return `${protocol}//${hostname}/ws`;
+        return `${protocol}//${hostname}`;
       }
     };
 
