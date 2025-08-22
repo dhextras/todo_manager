@@ -241,7 +241,7 @@ export default function TodoList({ listType, title, tasks }: TodoListProps) {
   return (
     <div
       ref={containerRef}
-      className={`flex-1 border backdrop-blur-sm ${accentColors[listType]} flex min-h-0 flex-col overflow-hidden rounded-xl pb-8 transition-all duration-200 ${
+      className={`flex-1 border backdrop-blur-sm ${accentColors[listType]} flex min-h-[88vh] flex-col overflow-hidden rounded-xl pb-8 transition-all duration-200 ${
         active ? dragActiveColors[listType] : "bg-gray-900/40"
       } ${otherUserActive ? otherUserDragActiveColors[listType] : ""}`}
     >
